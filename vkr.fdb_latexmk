@@ -1,7 +1,7 @@
 # Fdb version 3
-["pdflatex"] 1670968984 "/home/k0lba/Documents/matmex-diploma-template/vkr.tex" "vkr.pdf" "vkr" 1670968984
+["pdflatex"] 1670969399 "/home/k0lba/Documents/matmex-diploma-template/vkr.tex" "vkr.pdf" "vkr" 1670969399
   "/etc/texmf/web2c/texmf.cnf" 1669029353 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/k0lba/Documents/matmex-diploma-template/vkr.tex" 1670968982 15685 c6776f3d0861319c9b25c14f7e79ee27 ""
+  "/home/k0lba/Documents/matmex-diploma-template/vkr.tex" 1670969397 17768 58ad5f6e8c8e1ecfbaf4dd00cfbd5f11 ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/jknappen/ec/ectt1000.tfm" 1136768653 1536 06717a2b50de47d4087ac0e6cd759455 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmbx12.tfm" 1136768653 1324 c910af8c371558dc20f2d7822f66fe64 ""
@@ -208,8 +208,8 @@
   "header2.tex" 1670323505 572 cbda14913f88e8df8da7b120437511c0 ""
   "matmex-diploma-custom.cls" 1670326568 17749 d03ddd540cef9140c4328b2f12e7e270 ""
   "title.tex" 1670694359 9662 95a9b3821b051cd4a821cc62c809f3b0 ""
-  "vkr.aux" 1670968984 32 3985256e7290058c681f74d7a3565a19 "pdflatex"
-  "vkr.tex" 1670968982 15685 c6776f3d0861319c9b25c14f7e79ee27 ""
+  "vkr.aux" 1670969399 32 3985256e7290058c681f74d7a3565a19 "pdflatex"
+  "vkr.tex" 1670969397 17768 58ad5f6e8c8e1ecfbaf4dd00cfbd5f11 ""
   "vkr.toc" 0 -1 0 "pdflatex"
   (generated)
   "vkr.aux"
