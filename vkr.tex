@@ -121,7 +121,8 @@
   let k_n = Array.length b in
   let res = Array.make_matrix i_n j_n 0 in
 
-  Task.parallel_for pool ~start:0 ~finish:(i_n - 1) ~body:(fun i ->
+  Task.parallel_for pool ~start:0 ~finish:(i_n - 1)
+   ~body:(fun i ->
     for j = 0 to j_n - 1 do
       for k = 0 to k_n - 1 do
         res.(i).(j) <- res.(i).(j) + a.(i).(k) * b.(k).(j)
@@ -157,10 +158,11 @@
 \item Последней задачей оказалось слияние Stream’ов: Хотим доставать
 ответы по мере поступаления изнутри функции и вытягивать их на
 верхний уровень(в ответ)
+\end{itemize}
 
 Пример внешней параллелизации 2х revers$^o$ на списках длины 700 каждый:
 
-\begin{lstlisting}[caption=parallel_revers$^o$, language=OCaml, frame=single]
+\begin{lstlisting}[caption=parallel revers$^o$, language=OCaml, frame=single]
   let goal = Call ("reverso", [ len; Var "xs" ]) in
   let goal2 = Call ("reverso", [ len; Var "xz" ]) in
   let state0 =
@@ -189,21 +191,24 @@
   let pool = Task.setup_pool ~num_domains:2 () in
   let d = Task.async pool (fun _ -> wrap goal) in
   let d1 = Task.async pool (fun _ -> wrap1 goal2) in
-  match Task.run pool (fun () -> Task.await pool d, Task.await pool d1) with
+  match Task.run pool (fun () -> Task.await pool d,
+                           Task.await pool d1) with
   | Result.Ok a, Result.Ok b ->
     (a
     |> Stream.take ~n:(-1)
-    |> fun xs -> Format.printf "Got %d answers\n%!" (List.length xs));
+    |> fun xs -> Format.printf "Got %d answers\n%!"
+                       (List.length xs));
     b
     |> Stream.take ~n:(-1)
-    |> fun xs -> Format.printf "Got %d answers\n%!" (List.length xs)
+    |> fun xs -> Format.printf "Got %d answers\n%!"
+                       (List.length xs)
   | Ok _, Error _ | Error _, Ok _ | Error _, Error _ ->
     failwithf "%s %d" __FILE__ __LINE__
 \end{lstlisting}
 
 Пример форсирования и слияние stream:
 
-\begin{lstlisting}[caption=merge_stream, language=OCaml, frame=single]
+\begin{lstlisting}[caption=merge stream, language=OCaml, frame=single]
   let rec merge_Stream n =
   let open StateMonad.Syntax in
   let open StateMonad in
@@ -211,7 +216,8 @@
   match Chan.recv_poll c with
   | Some x ->
     let* () = put st in
-    return (Stream.mplus (Stream.return x)) <*> merge_Stream n
+    return (Stream.mplus (Stream.return x)) 
+                          <*> merge_Stream n
   | None -> return Stream.Nil
 ;;
 
@@ -225,9 +231,10 @@ let rec force_Stream x =
 ;;
 \end{lstlisting}
 
-Изначальная версия Conde$^e$:
+Изначальная версия Cond$^e$:
 
-\begin{lstlisting}[caption=Parallel_Conde$^e$, language=OCaml, frame=single]
+
+\begin{lstlisting}[caption=parallel cond$^e$, language=OCaml, frame=single]
   let* st = read in
       List.foldlm
         (fun acc y ->
@@ -241,7 +248,7 @@ let rec force_Stream x =
 
 Для этого было необходимо заменить mplus на синхронный опрос канала (Chan). Вот что у меня вышло:
 
-\begin{lstlisting}[caption=ParallelP_Conde$^e$, language=OCaml, frame=single]
+\begin{lstlisting}[caption=Parallel Cond$^e$, language=OCaml, frame=single]
   let c = Chan.make_unbounded () in
       let rec force_stream x =
         match x with
@@ -273,7 +280,6 @@ let rec force_Stream x =
       merge_stream c
 \end{lstlisting}
 
-\end{itemize}
 
 \section{Тестирование}
 
@@ -296,7 +302,8 @@ let rec force_Stream x =
   | Result.Ok a ->
     a
     |> Stream.take ~n:(-1)
-    |> fun xs -> Format.printf "Got %d answers\n%!" (List.length xs)
+    |> fun xs -> Format.printf "Got %d answers\n%!" 
+                  (List.length xs)
   | Error _ -> failwithf "%s %d" __FILE__ __LINE__);
 ;;
 \end{lstlisting}
