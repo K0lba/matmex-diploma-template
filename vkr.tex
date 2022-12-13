@@ -73,7 +73,7 @@
 \section{Реализация}
 Для практической реализации использовался текстовый редактор Visual Studio Code и открытый репозиторий в GitHub.
 
-Самой слдожной частью выполнения проекта стало освоение новых, ранее неизвестных языков: miniKanren и OCaml (Изучал я их по книгам)
+Самой слдожной частью выполнения проекта стало освоение новых, ранее неизвестных языков: miniKanren и OCaml (Изучал я их по книгам~\cite{reasoned_schemer}~\cite{prog_ocaml})
 Для примера, приведу базовое отношение в miniKanren append$^o$ --- конкатенации списков. А также для сравнения ее реализацию, но уже в OCaml:
 
 
@@ -114,19 +114,98 @@
 Для освоения способов применения мною были изучены предложенные примеры параллельного сложения матриц
 и рассмотренна реализация чисел Фибоначчи, которая тоже была распараллелена
 
+\begin{lstlisting}[caption=Domainslib, language=OCaml, frame=single]
+  let parallel_matrix_multiply pool a b =
+  let i_n = Array.length a in
+  let j_n = Array.length b.(0) in
+  let k_n = Array.length b in
+  let res = Array.make_matrix i_n j_n 0 in
+
+  Task.parallel_for pool ~start:0 ~finish:(i_n - 1) ~body:(fun i ->
+    for j = 0 to j_n - 1 do
+      for k = 0 to k_n - 1 do
+        res.(i).(j) <- res.(i).(j) + a.(i).(k) * b.(k).(j)
+      done
+    done);
+  res
+
+  let rec fib_par pool n =
+  if n <= 40 then fib n
+  else
+    let a = Task.async pool (fun _ -> fib_par pool (n-1)) in
+    let b = Task.async pool (fun _ -> fib_par pool (n-2)) in
+    Task.await pool a + Task.await pool b
+  
+  let c = Chan.make_bounded 0
+
+  let _ =
+    let send = Domain.spawn(fun _ ->
+            let b = Chan.send_poll c "hello" in
+            Printf.printf "%B\n" b) in
+    Domain.join send;
+\end{lstlisting}
+
 В этой работе есть возможность параллелить только дизъюнкцию (Cond$^e$), так как это выполнение двух независимых задач,
 в то время как все остальное -- зависимые задачи и нет осознания того, как их параллелить
 
 Задачи, которые мне предстояло выполнить:
 \begin{itemize}
-  \item Параллельный запуск appendo
-\item Параллельный запуск reverso (при котором возникла проблема
-нехватки памяти)
+  \item Параллельный запуск append$^o$
+\item Параллельный запуск revers$^o$ 
 \item Параллельный запуск некоторых функций, которые возвращают
 несколько ответов
 \item Последней задачей оказалось слияние Stream’ов: Хотим доставать
 ответы по мере поступаления изнутри функции и вытягивать их на
 верхний уровень(в ответ)
+
+Изначальная версия Conde$^e$:
+
+\begin{lstlisting}[caption=ParallelP_Conde$^e$, language=OCaml, frame=single]
+  let* st = read in
+      List.foldlm
+        (fun acc y ->
+          let* () = put st in
+          return (Stream.mplus acc) <*> (eval y))
+        (eval x)
+        xs
+\end{lstlisting}
+
+Но это все была лишь подготовка для того, что бы начать полноценную встроенную параллелизацию Cond$^e$ 
+
+Для этого было необходимо заменить mplus на синхронный опрос канала (Chan). Вот что у меня вышло:
+
+\begin{lstlisting}[caption=ParallelP_Conde$^e$, language=OCaml, frame=single]
+  let c = Chan.make_unbounded () in
+      let rec force_stream x =
+        match x with
+        | Stream.Cons (x, y) ->
+          Chan.send c x;
+          force_stream (Lazy.force y)
+        | Stream.Nil -> ()
+        | _ -> assert false
+      in
+      let* st = read in
+      let pool = Task.setup_pool ~num_domains:12 () in
+      let rec merge_stream n =
+        match Chan.recv_poll c with
+        | Some x ->
+          let* () = put st in
+          return (Stream.mplus (Stream.return x)) <*> merge_stream n
+        | None -> return Stream.Nil
+      in
+      let make_task acc =
+        Task.async pool (fun _ ->
+          force_stream (StateMonad.run (eval acc) st |> Result.get_ok))
+      in
+      let make_task_list lst =
+
+        Stdlib.List.map make_task lst
+      in
+      Task.run pool (fun () ->
+        Stdlib.List.iter (fun x -> Task.await pool x) (make_task_list lst));
+      merge_stream c
+\end{lstlisting}
+
 \end{itemize}
 
 \section{Тестирование}
@@ -182,6 +261,8 @@
 
 После нескольких экспериментов, сделан вывод, что запускать при малом количестве потоков, а также на малых обьемах данных не так выгодно, но при росте количества потоков пользы заметно больше.
 
+В результате проведенных тестов я обнаружил, что моя реализация работает не идеально. Если запускать программу, которая рекурсивно вызывает более 70 унификаций, то компилятор выдает ошибку: Task.run.loop
+В дальнейших планах доработать эту неисправность и сделать рефакторинг существуюшей реализации
 % \begin{enumerate}
 % \item Реализация должна быть. На публично доступную реализацию обязательная ссылка. Если код под \textsc{NDA}, то об этом, во-первых, должно быть сказано явно, и, во-вторых, на защиту должны выноситься другие результаты (например, архитектура), чтобы комиссия имела возможность оценить хоть что-то.
 % \begin{itemize}
