@@ -74,10 +74,10 @@
 Для практической реализации использовался текстовый редактор Visual Studio Code и открытый репозиторий на GitHub.
 
 Самой сложной частью выполнения проекта стало освоение новых, ранее неизвестных языков: miniKanren и OCaml~\cite{reasoned_schemer},~\cite{prog_ocaml}.
-Для примера, приведу базовое отношение в miniKanren append$^o$ --- конкатенации списков. А также для сравнения ее реализацию, но уже в OCaml:
+Для примера, приведу базовое отношение в miniKanren append$^o$ --- конкатенации списков. А также для сравнения ее реализацию, но уже в OCaml(Листинг 1, Листинг 2)
 
 
-\begin{lstlisting}[caption=Append$^o$, frame=single]
+\begin{lstlisting}[caption=Append$^o$ на Scheme (конкатенация двух списков), language=lisp, frame=single]
   (define (appendo l s out)
   (conde
     [(== l '()) (== s out)]
@@ -87,7 +87,7 @@
        (appendo d s res))])) 
 \end{lstlisting}
 
-\begin{lstlisting}[caption=Append$^o$, language=OCaml, frame=single]
+\begin{lstlisting}[caption=Append$^o$ на синтаксисе Unicanren (конкатенация двух списков), language=OCaml, frame=single]
   Conde
     [ Conj [ Unify (Var "xs", Nil); Unify (Var "ys", Var "xys") ]
     ; Fresh
@@ -104,12 +104,14 @@
     ]
 \end{lstlisting}
 
-Теперь не возникнет вопросов, почему на это ушло так много времени
-
 Для освоения способов применения мною были изучены предложенные примеры параллельного сложения матриц
-и рассмотренна реализация чисел Фибоначчи, которая тоже была распараллелена
+и рассмотренна реализация чисел Фибоначчи, которая тоже была распараллелена. Также были освоены примеры приминения каналов(Chan) 
+для передачи данных между доменами (Листинг 3).
+ссылки
 
-\begin{lstlisting}[caption=Domainslib, language=OCaml, frame=single]
+\begin{lstlisting}[caption={Применение Domainslib 
+  для сложения матриц, 
+  чисел Фибоначчи и каналов}, language=OCaml, frame=single]
   let parallel_matrix_multiply pool a b =
   let i_n = Array.length a in
   let j_n = Array.length b.(0) in
@@ -141,64 +143,50 @@
     Domain.join send;
 \end{lstlisting}
 
-В этой работе есть возможность параллелить только дизъюнкцию (Cond$^e$), так как это выполнение двух независимых задач,
-в то время как все остальное -- зависимые задачи и нет осознания того, как их параллелить
+В этой работе есть возможность параллелить только дизъюнкцию (Cond$^e$), так как она является выполнением двух независимых задач,
+в то время как все остальные примитивы miniKanren --- зависимые задачи и нет осознания того, как их параллелить.
 
 Задачи, которые мне предстояло выполнить:
 \begin{itemize}
-  \item Параллельный запуск append$^o$
-\item Параллельный запуск revers$^o$ 
+  \item Параллельный запуск append$^o$;
+\item Параллельный запуск revers$^o$;
 \item Параллельный запуск некоторых функций, которые возвращают
-несколько ответов
+несколько ответов;
 \item Последней задачей оказалось слияние Stream’ов: Хотим доставать
 ответы по мере поступаления изнутри функции и вытягивать их на
-верхний уровень(в ответ)
+верхний уровень(в ответ);
+\item Объеденить все задачи и положить в интерпретатор.
 \end{itemize}
 
-Пример внешней параллелизации 2х revers$^o$ на списках длины 700 каждый:
+Пример внешней параллелизации двух revers$^o$ на списках длины 700 каждый:
 
 \begin{lstlisting}[caption=parallel revers$^o$, language=OCaml, frame=single]
   let goal = Call ("reverso", [ len; Var "xs" ]) in
-  let goal2 = Call ("reverso", [ len; Var "xz" ]) in
-  let state0 =
+  let state =
     State.(
       empty
       |> "xs" --> Var 10
       |> add_rel "appendo" [ "xs"; "ys"; "xys" ] appendo_body
       |> add_rel "reverso" [ "xy"; "yx" ] reverso_body)
   in
-  let state1 =
-    State.(
-      empty
-      |> "xz" --> Var 10
-      |> add_rel "appendo" [ "xs"; "ys"; "xys" ] appendo_body
-      |> add_rel "reverso" [ "xy"; "yx" ] reverso_body)
-  in
   let wrap g =
-    let s = StateMonad.run (eval first_logic g) state0 in
-    (* let _ = Result.map (Stream.take ~n:1) s in ~trace_uni:true*)
+    let s = StateMonad.run (eval g) state in
     s
   in
-  let wrap1 g =
-    let s = StateMonad.run (eval second_logic g) state1 in
-    s
-  in
-  let pool = Task.setup_pool ~num_domains:2 () in
-  let d = Task.async pool (fun _ -> wrap goal) in
-  let d1 = Task.async pool (fun _ -> wrap1 goal2) in
-  match Task.run pool (fun () -> Task.await pool d,
-                           Task.await pool d1) with
-  | Result.Ok a, Result.Ok b ->
-    (a
-    |> Stream.take ~n:(-1)
-    |> fun xs -> Format.printf "Got %d answers\n%!"
-                       (List.length xs));
-    b
-    |> Stream.take ~n:(-1)
-    |> fun xs -> Format.printf "Got %d answers\n%!"
-                       (List.length xs)
-  | Ok _, Error _ | Error _, Ok _ | Error _, Error _ ->
-    failwithf "%s %d" __FILE__ __LINE__
+  let pool = Task.setup_pool ~num_domains:12 () in
+  let a = Task.async pool (fun _ -> wrap goal) in
+  let b = Task.async pool (fun _ -> wrap goal) in
+  (match Task.run pool (fun () -> Task.await pool a, 
+  Task.await pool b) with
+   | Result.Ok a, Result.Ok b -> Stream.mplus a b
+   | Ok _, Error _ | Error _, Ok _ | Error _, Error _ ->
+     failwithf "%s %d" __FILE__ __LINE__)
+  |> Stream.take ~n:(-1)
+  |> (fun xs ->
+       Format.printf "Got %d answers\n%!" (List.length xs);
+       xs)
+  |> List.iter (fun st -> printf "%a\n" Value.pp 
+  (Value.walk st (Value.var 10)))
 \end{lstlisting}
 
 Пример форсирования и слияние stream:
