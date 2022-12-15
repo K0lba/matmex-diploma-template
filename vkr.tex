@@ -17,10 +17,10 @@
 \DeclareCaptionFormat{listing}{
     \parbox{\textwidth}{\hspace{15pt}#1#2#3}
 }
-\captionsetup[lstlisting]{ format=listing
-  %, labelfont=white, textfont=white
-  , singlelinecheck=false, margin=0pt, font={bf}
-}
+% \captionsetup[lstlisting]{ format=listing
+%   %, labelfont=white, textfont=white
+%   , singlelinecheck=false, margin=0pt, font={bf}
+% }
 
 \begin{document}
 \input{title.tex}
@@ -73,11 +73,11 @@
 \section{Реализация}
 Для практической реализации использовался текстовый редактор Visual Studio Code и открытый репозиторий на GitHub.
 
-Самой сложной частью выполнения проекта стало освоение новых, ранее неизвестных языков: miniKanren и OCaml~\cite{reasoned_schemer},~\cite{prog_ocaml}.
+Самой сложной частью выполнения проекта стало освоение новых, ранее неизвестных языков: miniKanren и OCaml~\cite{scheme},~\cite{prog_ocaml}.
 Для примера, приведу базовое отношение в miniKanren append$^o$ --- конкатенации списков. А также для сравнения ее реализацию, но уже в OCaml(Листинг 1, Листинг 2)
 
 
-\begin{lstlisting}[caption=Append$^o$ на Scheme (конкатенация двух списков), language=lisp, frame=single]
+\begin{lstlisting}[caption=\textbf{Append$^o$ на Scheme (конкатенация двух списков)}, language=lisp, frame=single]
   (define (appendo l s out)
   (conde
     [(== l '()) (== s out)]
@@ -87,7 +87,7 @@
        (appendo d s res))])) 
 \end{lstlisting}
 
-\begin{lstlisting}[caption=Append$^o$ на синтаксисе Unicanren (конкатенация двух списков), language=OCaml, frame=single]
+\begin{lstlisting}[caption=\textbf{Append$^o$ на синтаксисе Unicanren (конкатенация двух списков)}, language=OCaml, frame=single]
   Conde
     [ Conj [ Unify (Var "xs", Nil); Unify (Var "ys", Var "xys") ]
     ; Fresh
@@ -109,7 +109,7 @@
 для передачи данных между доменами (Листинг 3).
 ссылки
 
-\begin{lstlisting}[caption={Применение Domainslib 
+\begin{lstlisting}[caption=\textbf{Применение Domainslib 
   для сложения матриц, 
   чисел Фибоначчи и каналов}, language=OCaml, frame=single]
   let parallel_matrix_multiply pool a b =
@@ -160,7 +160,7 @@
 
 Пример внешней параллелизации двух revers$^o$ на списках длины 700 каждый (Листинг 4)
 
-\begin{lstlisting}[caption=Параллелизация двух revers$^o$ на списках длины 700, language=OCaml, frame=single]
+\begin{lstlisting}[caption=\textbf{Параллелизация двух revers$^o$ на списках длины 700}, language=OCaml, frame=single]
   let goal = Call ("reverso", [ len; Var "xs" ]) in
   let state =
     State.(
@@ -189,35 +189,38 @@
   (Value.walk st (Value.var 10)))
 \end{lstlisting}
 
-Пример форсирования и слияния stream:
+Пример форсирования и слияния stream (Листинг 5)
 
-\begin{lstlisting}[caption=merge stream, language=OCaml, frame=single]
-  let rec merge_Stream n =
+\begin{lstlisting}[caption=\textbf{Форсирования и слияния stream}, language=OCaml, frame=single]
+  let rec merge_stream n =
   let open StateMonad.Syntax in
   let open StateMonad in
   let* st = read in
   match Chan.recv_poll c with
   | Some x ->
     let* () = put st in
-    return (Stream.mplus (Stream.return x)) 
-                          <*> merge_Stream n
+    return (Stream.mplus (Stream.return x)) <*> 
+    merge_stream n
   | None -> return Stream.Nil
 ;;
 
-let rec force_Stream x =
+let rec force_stream x =
   match x with
   | Stream.Cons (x, y) ->
     Chan.send c x;
-    force_Stream (Lazy.force y)
+    force_stream (Lazy.force y)
   | Stream.Nil -> ()
   | _ -> assert false
 ;;
 \end{lstlisting}
 
-Изначальная версия Cond$^e$ (Листинг 6)
+На листинге 5 представлены две функции: force\_stream, которая принимает список потоков и каждый поток записывает в канал, а также 
+merge\_stream, которая собирает все потоки из канал (Chan) и объединяет их в ответ.
+
+Изначальная версия Cond$^e$ принимает список goal и последовательно, проходя весь список, добавляет их значения в ответ (Листинг 6).
 
 
-\begin{lstlisting}[caption=parallel cond$^e$, language=OCaml, frame=single]
+\begin{lstlisting}[caption=\textbf{Изначальная реализация Сond$^e$}, language=OCaml, frame=single]
   let* st = read in
       List.foldlm
         (fun acc y ->
@@ -229,9 +232,9 @@ let rec force_Stream x =
 
 Но это все была лишь подготовка для того, чтобы начать полноценную встроенную параллелизацию Cond$^e$. 
 
-Для этого было необходимо заменить mplus на синхронный опрос канала (Chan). Вот, что у меня вышло (Листинг 7)
+Для этого было необходимо заменить mplus на синхронный опрос канала (Chan)(Листинг 7).
 
-\begin{lstlisting}[caption=Parallel Cond$^e$, language=OCaml, frame=single]
+\begin{lstlisting}[caption=\textbf{Параллельная реализация Cond$^e$}, language=OCaml, frame=single]
   let c = Chan.make_unbounded () in
       let rec force_stream x =
         match x with
@@ -247,26 +250,30 @@ let rec force_Stream x =
         match Chan.recv_poll c with
         | Some x ->
           let* () = put st in
-          return (Stream.mplus (Stream.return x)) <*> merge_stream n
+          return (Stream.mplus (Stream.return x)) <*> 
+          merge_stream n
         | None -> return Stream.Nil
       in
       let make_task acc =
         Task.async pool (fun _ ->
-          force_stream (StateMonad.run (eval acc) st |> Result.get_ok))
+          force_stream (StateMonad.run (eval acc) st 
+          |> Result.get_ok))
       in
       let make_task_list lst =
 
         Stdlib.List.map make_task lst
       in
       Task.run pool (fun () ->
-        Stdlib.List.iter (fun x -> Task.await pool x) (make_task_list lst));
+        Stdlib.List.iter (fun x -> Task.await pool x) 
+        (make_task_list lst));
       merge_stream c
 \end{lstlisting}
 
+На листинге 7 представлена реализация параллельного cond$^e$. В отличие от обычной версии этот cond$^e$ запускает все goal из списка параллельно, и, по мере поступаления ответов, объединяет их с помощью уже выше упомянутых merge\_stream и force\_stream. 
 
 \section{Тестирование}
 
-\begin{lstlisting}[caption=Tests, language=OCaml, frame=single]
+\begin{lstlisting}[caption=\textbf{Запуск двух параллельных append$^o$ (на параллельном и на обычном cond$^e$)}, language=OCaml, frame=single]
   (let goal =
     CondePar
       [ Call ("appendo", [ Var "xs"; Var "ys"; len ])
@@ -291,30 +298,11 @@ let rec force_Stream x =
 ;;
 \end{lstlisting}
 
-\begin{figure}[h]
+Входные данные: Параллельно запущены два append$^o$ на списках длины 7000 каждый.Количество потоков: 2 
+На данном тесте параллельная реализация выполнила задачу за 26.7 секунд, в то время как обычная реализация сделала это за 27.5 секунд
 
-  \centering
-  
-  \includegraphics[width=0.8\linewidth]{1test.jpg}
-  
-  \caption{Входные данные: Параллельно запущены 2 append$^o$ на списках длины 7000 каждый.
-  Количество потоков: 2}
-  
-  \label{fig:mpr}
-  
-\end{figure}
-\begin{figure}[h]
-
-  \centering
-    
-  \includegraphics[width=0.8\linewidth]{2test.jpg}
-    
-  \caption{Входные данные: Параллельно запущены 2 append$^o$ на списках длины 8000 каждый.
-  Количество потоков: 12}
-    
-  \label{fig:mpr}
-    
-\end{figure}
+Входные данные: Параллельно запущены два append$^o$ на списках длины 8000 каждый.Количество потоков: 12
+На этом тесте параллельная реализация справилась за 24.2 секунды, в то время как обычная реализация --- за 40.4 секунд
 
 После нескольких экспериментов, сделан вывод, что запускать при малом количестве потоков, а также на малых обьемах данных не так выгодно, но при росте количества потоков пользы заметно больше.
 
