@@ -41,7 +41,7 @@
 % \section{Обзор}
 % \input{020related}
 
-\section*{3. Обзор используемых инструментов}
+\section{Обзор используемых инструментов}
 \input{instruments}
 
 % \section{Background (опционально)}
@@ -71,25 +71,20 @@
 % \end{enumerate} 
 
 \section{Реализация}
-Для практической реализации использовался текстовый редактор Visual Studio Code и открытый репозиторий в GitHub.
+Для практической реализации использовался текстовый редактор Visual Studio Code и открытый репозиторий на GitHub.
 
-Самой сложной частью выполнения проекта стало освоение новых, ранее неизвестных языков: miniKanren и OCaml (Изучал я их по книгам~\cite{reasoned_schemer}~\cite{prog_ocaml})
+Самой сложной частью выполнения проекта стало освоение новых, ранее неизвестных языков: miniKanren и OCaml~\cite{reasoned_schemer},~\cite{prog_ocaml}.
 Для примера, приведу базовое отношение в miniKanren append$^o$ --- конкатенации списков. А также для сравнения ее реализацию, но уже в OCaml:
 
 
 \begin{lstlisting}[caption=Append$^o$, frame=single]
-  (defrel (appendo l t out)
-    (conde
-      ((nullo l) (== t out))
-      ((fresh (res)
-        (fresh (d)
-          (cdro l d)
-          (appendo d t
-          res))
-        (fresh (a)
-          (caro l a)
-          (conso a res
-          out))))))
+  (define (appendo l s out)
+  (conde
+    [(== l '()) (== s out)]
+    [(fresh (a d res)
+       (== `(,a . ,d) l)
+       (== `(,a . ,res) out)
+       (appendo d s res))])) 
 \end{lstlisting}
 
 \begin{lstlisting}[caption=Append$^o$, language=OCaml, frame=single]
@@ -244,9 +239,9 @@ let rec force_Stream x =
         xs
 \end{lstlisting}
 
-Но это все была лишь подготовка для того, что бы начать полноценную встроенную параллелизацию Cond$^e$ 
+Но это все была лишь подготовка для того, чтобы начать полноценную встроенную параллелизацию Cond$^e$ 
 
-Для этого было необходимо заменить mplus на синхронный опрос канала (Chan). Вот что у меня вышло:
+Для этого было необходимо заменить mplus на синхронный опрос канала (Chan). Вот, что у меня вышло:
 
 \begin{lstlisting}[caption=Parallel Cond$^e$, language=OCaml, frame=single]
   let c = Chan.make_unbounded () in
