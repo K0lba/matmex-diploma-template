@@ -73,247 +73,188 @@
 \section{Реализация}
 Для практической реализации использовался текстовый редактор Visual Studio Code и открытый репозиторий на GitHub.
 
-Самой сложной частью выполнения проекта стало освоение новых, ранее неизвестных языков: miniKanren и OCaml~\cite{scheme},~\cite{prog_ocaml}.
-Для примера, приведу базовое отношение в miniKanren append$^o$ --- конкатенации списков. А также для сравнения ее реализацию, но уже в OCaml(Листинг 1, Листинг 2)
+\subsection{Проектирование сервиса} 
+После анализа аналогов, был сделан вывод, что за основу стоит взять CloudShark, так как его интерфейс максимально приближен к Wireshark.
+Для реализация серверной части был использован фреймворк Flask.
+Для версти веб-страницы был выбран Bootstrap.
+Для парсинга пакетов была использована библиотека для Python -- dpkt.
+Основной причиной выбора этих библиотек и фреймворков послужило то, что они были использованы при создании Miminet.
+Все pcap файлы после обработки представляли JSON (JavaScript Object
+Notation) файл, с помощью которого удобно передавать информацию в html часть сервиса.
+
+Схема работы сервиса:
+\begin{figure}[!ht]
+  \begin{center}
+  \includegraphics[scale=1.3]{Scheme_of_project.png}\caption{Схема обработки файлов на сервере}\label{figure2}
+  \end{center}
+\end{figure}
 
 
-\begin{lstlisting}[caption=\textbf{Append$^o$ на Scheme (конкатенация двух списков)}, language=lisp, frame=single]
-  (define (appendo l s out)
-  (conde
-    [(== l '()) (== s out)]
-    [(fresh (a d res)
-       (== `(,a . ,d) l)
-       (== `(,a . ,res) out)
-       (appendo d s res))])) 
+\subsection{Реализация серверной части} 
+Испольщование Flask помогло без проблем созать серверную часть. Помог также встроенный в него шаблонизатор Jinja.
+Благодаря ему, можно с легкостью передавать в html обработанные в json pcap файлы.
+Учитывая, что Miminet написан на Flask, готовый продукт без труда можно было подключить в качестве новой вкладки.
+
+Ниже представлен Flask декоратор -- функция, которая запускает страницу проекта:
+\begin{lstlisting}[caption=\textbf{Основной декоратор}, language=Python, frame=single]
+  @app.route('/MimiShark')
+  def main_page():
+    data = ReadJson(path)
+    return render_template('main.html',pcap_data = data)
 \end{lstlisting}
 
-\begin{lstlisting}[caption=\textbf{Append$^o$ в синтаксисе Unicanren (конкатенация двух списков)}, language=OCaml, frame=single]
-  Conde
-    [ Conj [ Unify (Var "xs", Nil); Unify (Var "ys", Var "xys") ]
-    ; Fresh
-      ( "h"
-     , Fresh
-         ( "tmp"
-        , Fresh
-          ( "tl"
-          , Conj
-            [ Unify (Cons (Var "h", Var "tl"), Var "xs")
-            ; Unify (Cons (Var "h", Var "tmp"), Var "xys")
-            ; Call ("appendo", [ Var "tl"; Var "ys"; Var "tmp" ])
-            ] ) ) )
-    ]
+В этой функции происходит считывание заготовленного json файла, а далее рендер нужной html страницы, с переданными данными.
+
+Далее представлена работа шаблонизатора Jinja:
+\begin{lstlisting}[caption=\textbf{Передача pcap файлов в html}, language=HTML, frame=single]
+  {% block pcap %}
+  {% for el in pcap_data %}
+  <tr id="{{loop.index}}">
+    <th scope="row">{{loop.index}}</th>
+    <td>{{el.time}}</td>
+    <td>{{el.source}}</td>
+    <td>{{el.destination}}</td>
+    <td>{{el.protocol}}</td>
+    <td>{{el.length}}</td>
+  </tr>
+  {%endfor%}
+  {% endblock %}
 \end{lstlisting}
 
-Для освоения способов применения были изучены предложенные примеры параллельного сложения матриц
-и рассмотренна реализация чисел Фибоначчи, которая тоже была распараллелена. Также были освоены примеры приминения каналов(Chan) 
-для передачи данных между доменами (Листинг 3).
-ссылки
+Здесь представлен блок кода (block pcap), 
+который будет отображен на веб-странице, 
+в нем с помощью цикла, выводятся все файлы, полученные в качестве переменной 
+pcap data из предыдущего листинга.
 
-\begin{lstlisting}[caption=\textbf{Применение Domainslib 
-  для сложения матриц, 
-  чисел Фибоначчи и каналов}, language=OCaml, frame=single]
-  let parallel_matrix_multiply pool a b =
-  let i_n = Array.length a in
-  let j_n = Array.length b.(0) in
-  let k_n = Array.length b in
-  let res = Array.make_matrix i_n j_n 0 in
 
-  Task.parallel_for pool ~start:0 ~finish:(i_n - 1)
-   ~body:(fun i ->
-    for j = 0 to j_n - 1 do
-      for k = 0 to k_n - 1 do
-        res.(i).(j) <- res.(i).(j) + a.(i).(k) * b.(k).(j)
-      done
-    done);
-  res
+\subsection{Реализация графической составляющей} 
+Как уже говорилось в обзоре используемых инструментов, с помощью Bootstrap, можно легко созать шаблон сайта за короткое время.
+Так как Miminet также был написан на Bootstrap, было принято решение сделать страницу по стилю, максимально приближенному к стилю Miminet.
+Поначалу задумывалось использовать приложение Figma для составления наброска сайта.
+Но интерфейс сайта был настолько легким в реализациии, а шаблоны Bootstrap в освоении., что использование Figma было излишним.
 
-  let rec fib_par pool n =
-  if n <= 40 then fib n
-  else
-    let a = Task.async pool (fun _ -> fib_par pool (n-1)) in
-    let b = Task.async pool (fun _ -> fib_par pool (n-2)) in
-    Task.await pool a + Task.await pool b
-  
-  let c = Chan.make_bounded 0
 
-  let _ =
-    let send = Domain.spawn(fun _ ->
-            let b = Chan.send_poll c "hello" in
-            Printf.printf "%B\n" b) in
-    Domain.join send;
+
+Макет сайта по собранной информации:
+\begin{figure}[!ht]
+  \begin{center}
+  \includegraphics[scale=0.6]{layout.png}\caption{Макет сайта}\label{figure1}
+  \end{center}
+\end{figure}
+
+
+\newpage
+Конечная версия сайта выглядит так:
+\begin{figure}[!ht]
+  \begin{center}
+  \includegraphics[scale=0.4]{cite.jpg}\caption{Внешний вид сайта}\label{figure2}
+  \end{center}
+\end{figure}
+
+Также для написания сайта использовался JavaScript. С его помощью были написаны функции вывода данных при нажатии по файлу из таблицы.
+
+
+
+\subsection{Парсинг и передача пакетов на сайт} 
+Чтобы проверить правильность написания парсера, из Wireshark были экспортированные некоторые pcap файлы.
+Благодаря библиотеке dpkt из них легко можно было достать нужную информацию:
+Ethernet данные файла(место назначения переданных данных,
+место, откуда эти данные были переданы, его тип),
+версию и другие полезные данные интернет протокола,
+а также все данные протокола управления передачей.
+
+На листинге представлена функция получения всех данных о протоколах:
+\begin{lstlisting}[caption=\textbf{Получение данных из протоколов}, language=Python, frame=single]
+  import dpkt
+  def protocol_prop(self):
+    l_ = []
+    
+    def add_field(fn, fv):
+      l_.append('%s=%s,' % (fn, fv))
+
+    for field_name in self.__public_fields__:
+        if isinstance (self, dpkt.tcp.TCP):
+            tcp = self
+            d = {dpkt.tcp.TH_FIN:'FIN', dpkt.tcp.TH_SYN:'SYN', 
+            dpkt.tcp.TH_RST:'RST', dpkt.tcp.TH_PUSH:'PUSH', 
+            dpkt.tcp.TH_ACK:'ACK', dpkt.tcp.TH_URG:'URG'}
+            active_flags = filter(lambda t: 
+                                  t[0] & tcp.flags, d.items())
+            flags_str = '+'.join(t[1] for t in active_flags)
+            flag = f'({str(flags_str)})'
+
+        add_field(field_name, getattr(self, field_name))
+
+    ip_prot = '%s:' % self.__class__.__name__  
+    for ii in l_:
+        ip_prot += '%s' % ii
+    return ip_prot
 \end{lstlisting}
+В функции protocol properties есть дополнительная функция добавления поля с его значением в лист, из которого они в дальнейшем будут считываться в ответ.
+Далее функция проходит циклом по всем полям, при этом происходит проверка: если переданный файл содержит tcp протокол, то выводим нужное имя флага.
+Также в цикле определяются значения полей и добавляются в список для отображения.
+В конце функции, собранные данные из списка, добавляются в ответ, который по итогу функция возвращает. 
 
-В этой работе есть возможность параллелить только дизъюнкцию (Cond$^e$), так как она является выполнением двух независимых задач,
-в то время как все остальные примитивы miniKanren --- зависимые задачи и нет осознания того, как их параллелить.
+На этом листинге представлен парсер, основанный на dpkt:
+\begin{lstlisting}[caption=\textbf{Работа парсера pcap файлов}, language=Python, frame=single]
+  def add_packets(pcap):
+    with open("pcap.json","w") as file:
+        for  timestamp, buf in pcap:
+            pcap_file = {}
+            eth = dpkt.ethernet.Ethernet(buf)
 
-Задачи, которые мне предстояло выполнить:
-\begin{itemize}
-  \item параллельный запуск append$^o$;
-\item параллельный запуск revers$^o$;
-\item параллельный запуск некоторых функций, которые возвращают
-несколько ответов;
-\item последней задачей оказалось слияние Stream’ов: Хотим доставать
-ответы по мере поступаления изнутри функции и вытягивать их на
-верхний уровень(в ответ);
-\item объеденить все задачи и положить в интерпретатор.
-\end{itemize}
+            if not isinstance(eth.data, dpkt.ip.IP):
+                continue
+            
+            pcap_file["time"] = str(datetime.datetime
+                              .utcfromtimestamp(timestamp))
 
-Пример внешней параллелизации двух revers$^o$ на списках длины 700 каждый (Листинг 4)
+            ip = eth.data
+            pcap_file["source"] = inet_to_str(ip.src)
+            pcap_file["destination"] = inet_to_str(ip.dst)
+            pcap_file["protocol"] = ip.get_proto(ip.p).__name__
+            pcap_file["length"] = ip.len
+            
+            bytes_repr = ' '.join(mac_to_str(buf).split(':'))
 
-\begin{lstlisting}[caption=\textbf{Параллелизация двух revers$^o$ на списках длины 700}, language=OCaml, frame=single]
-  let goal = Call ("reverso", [ len; Var "xs" ]) in
-  let state =
-    State.(
-      empty
-      |> "xs" --> Var 10
-      |> add_rel "appendo" [ "xs"; "ys"; "xys" ] appendo_body
-      |> add_rel "reverso" [ "xy"; "yx" ] reverso_body)
-  in
-  let wrap g =
-    let s = StateMonad.run (eval g) state in
-    s
-  in
-  let pool = Task.setup_pool ~num_domains:12 () in
-  let a = Task.async pool (fun _ -> wrap goal) in
-  let b = Task.async pool (fun _ -> wrap goal) in
-  (match Task.run pool (fun () -> Task.await pool a, 
-  Task.await pool b) with
-   | Result.Ok a, Result.Ok b -> Stream.mplus a b
-   | Ok _, Error _ | Error _, Ok _ | Error _, Error _ ->
-     failwithf "%s %d" __FILE__ __LINE__)
-  |> Stream.take ~n:(-1)
-  |> (fun xs ->
-       Format.printf "Got %d answers\n%!" (List.length xs);
-       xs)
-  |> List.iter (fun st -> printf "%a\n" Value.pp 
-  (Value.walk st (Value.var 10)))
+            ascii = ''
+            for i in bytes_repr.split(' '):
+                a = bytes.fromhex(i)
+                b = str(a)[2:len((str(a)))-1]
+                if(len(b)<2):
+                    ascii += b
+                else:
+                    ascii+= '.'
+            pcap_file["ascii"] = ascii
+            pcap_file["bytes"] = bytes_repr
+
+            pcap_file["decode_eth"] = '%s:%s:%s' % 
+            (mac_to_str(eth.dst), 
+            mac_to_str(eth.src), bytes_repr[36:41])
+            pcap_file["decode_ip"] = ip_protocol_prop(ip)
+            pcap_file[f"decode_{ip.data}"] = 
+                                ip_protocol_prop(ip.data)
+
+            json_file.append(pcap_file)
+        print(json.dumps(json_file), file=file)
 \end{lstlisting}
+Перед вызовом этой функции идет открытие и считывание pcap файлов. В функции происходит следующее: 
 
-Пример форсирования и слияния stream (Листинг 5)
+Для каждого пакета из pcap обрабатывается содержимое.
+Распаковывается ethernet frame. Достается ip пакетов и байты. Далее байты сопоставляются с ascii таблицей.
+А также подробно описываются данные файлов.
+Обработанные файлы отправляются в созданный json.
 
-\begin{lstlisting}[caption=\textbf{Форсирования и слияния stream}, language=OCaml, frame=single]
-  let rec merge_stream n =
-  let open StateMonad.Syntax in
-  let open StateMonad in
-  let* st = read in
-  match Chan.recv_poll c with
-  | Some x ->
-    let* () = put st in
-    return (Stream.mplus (Stream.return x)) <*> 
-    merge_stream n
-  | None -> return Stream.Nil
-;;
-
-let rec force_stream x =
-  match x with
-  | Stream.Cons (x, y) ->
-    Chan.send c x;
-    force_stream (Lazy.force y)
-  | Stream.Nil -> ()
-  | _ -> assert false
-;;
-\end{lstlisting}
-
-На листинге 5 представлены две функции: force\_stream, которая принимает список потоков и каждый поток записывает в канал, а также 
-merge\_stream, которая собирает все потоки из канал (Chan) и объединяет их в ответ.
-
-Изначальная версия Cond$^e$ принимает список goal и последовательно, проходя весь список, добавляет их значения в ответ (Листинг 6).
-
-
-\begin{lstlisting}[caption=\textbf{Изначальная реализация Сond$^e$}, language=OCaml, frame=single]
-  let* st = read in
-      List.foldlm
-        (fun acc y ->
-          let* () = put st in
-          return (Stream.mplus acc) <*> (eval y))
-        (eval x)
-        xs
-\end{lstlisting}
-
-Но это все была лишь подготовка для того, чтобы начать полноценную встроенную параллелизацию Cond$^e$. 
-
-Для этого было необходимо заменить mplus на синхронный опрос канала (Chan)(Листинг 7).
-
-\begin{lstlisting}[caption=\textbf{Параллельная реализация Cond$^e$}, language=OCaml, frame=single]
-  let c = Chan.make_unbounded () in
-      let rec force_stream x =
-        match x with
-        | Stream.Cons (x, y) ->
-          Chan.send c x;
-          force_stream (Lazy.force y)
-        | Stream.Nil -> ()
-        | _ -> assert false
-      in
-      let* st = read in
-      let pool = Task.setup_pool ~num_domains:12 () in
-      let rec merge_stream n =
-        match Chan.recv_poll c with
-        | Some x ->
-          let* () = put st in
-          return (Stream.mplus (Stream.return x)) <*> 
-          merge_stream n
-        | None -> return Stream.Nil
-      in
-      let make_task acc =
-        Task.async pool (fun _ ->
-          force_stream (StateMonad.run (eval acc) st 
-          |> Result.get_ok))
-      in
-      let make_task_list lst =
-
-        Stdlib.List.map make_task lst
-      in
-      Task.run pool (fun () ->
-        Stdlib.List.iter (fun x -> Task.await pool x) 
-        (make_task_list lst));
-      merge_stream c
-\end{lstlisting}
-
-На листинге 7 представлена реализация параллельного cond$^e$. В отличие от обычной версии этот cond$^e$ запускает все goal из списка параллельно, и, по мере поступаления ответов, объединяет их с помощью уже выше упомянутых merge\_stream и force\_stream. 
-
-\section{Тестирование}
-
-\begin{lstlisting}[caption=\textbf{Запуск двух параллельных append$^o$ (на параллельном и на обычном cond$^e$)}, language=OCaml, frame=single]
-  (let goal =
-    CondePar
-      [ Call ("appendo", [ Var "xs"; Var "ys"; len ])
-      ; Call ("appendo", [ Var "xs"; Var "ys"; len ])
-      ]
-  in
-  let env =
-    State.(
-      empty
-      |> "xs" --> Var 9
-      |> "ys" --> Var 10
-      |> add_rel "appendo" [ "xs"; "ys"; "xys" ] appendo_body)
-  in
-  let a = StateMonad.run (eval goal) env in
-  match a with
-  | Result.Ok a ->
-    a
-    |> Stream.take ~n:(-1)
-    |> fun xs -> Format.printf "Got %d answers\n%!" 
-                  (List.length xs)
-  | Error _ -> failwithf "%s %d" __FILE__ __LINE__);
-;;
-\end{lstlisting}
-
-Входные данные: Параллельно запущены два append$^o$ на списках длины 7000 каждый.Количество потоков: 2 
-На данном тесте параллельная реализация выполнила задачу за 26.7 секунд, в то время как обычная реализация сделала это за 27.5 секунд
-
-Входные данные: Параллельно запущены два append$^o$ на списках длины 8000 каждый.Количество потоков: 12
-На этом тесте параллельная реализация справилась за 24.2 секунды, в то время как обычная реализация --- за 40.4 секунд
-
-После нескольких экспериментов, сделан вывод, что запускать при малом количестве потоков, а также на малых обьемах данных не так выгодно, но при росте количества потоков пользы заметно больше.
-
-В результате проведенных тестов я обнаружил, что моя реализация работает не идеально. Если запускать программу, которая рекурсивно вызывает более 70 унификаций, то runtime выдает ошибку: Task.run.loop
-
-\subsection{Дальнейшие планы}
-
-Протестировать на некотором количестве данных и убедиться, что
-работа действительно повышает эффективнось выполения задач 
-Доработать неисправности и сделать рефакторинг
-существуюшей реализации.
+\subsection{Внедрение готового проекта в Miminet}
+Завершающей частью работы была интеграция готового продукта в приложение Miminet.
+Для выполнения этой задачи была изменена не только сктруктура файлов проекта, но и исходные файлы Miminet. 
+С помощью шаблонизатора Jinja веб-страница анализатора была перебазирована под стиль, который используется разработчиками Miminet.
+Переход на страницу анализатора происходит по добавленной для каждого компонента ссылке, которая содержит
+свой маршрут -- 
+\newline
+/MimiShark?guid=...,
+где guid --  статистически уникальный 128-битный идентификатор, присваиваемый каждому конструктору сети.
+На странице выводятся файлы, содержащиеся в компоненте.
 
 
 % \begin{enumerate}
